@@ -27,7 +27,7 @@ export class SurveyService {
     if (!surveyId || !Types.ObjectId.isValid(surveyId))
       throw new BadRequestException('Survey id is missing or invalid');
     // Get the survey with the questions populated.
-    const aggregateOptions = getSurveyOptions(surveyId);
+    const aggregateOptions = this.getSurveyOptions(surveyId);
     const foundSurvey = await Survey.aggregate(aggregateOptions).then(
       (res) => res[0],
     );
@@ -68,41 +68,18 @@ export class SurveyService {
     if (!surveyFound)
       throw new NotFoundException(`Survey with id \"${surveyId}\"not found`);
     // Check if the survey is still open.
-    if (new Date(surveyFound.endDate).getTime() < new Date().getTime()) {
-      throw new BadRequestException(
-        'Survey is closed and cannot accept new responses',
-      );
-    }
-    // Check if the answers are at the same number of questions.
-    if (surveyResponse.response.length != surveyFound.questions.length)
-      throw new BadRequestException(
-        `Invalid number of answers given {${surveyResponse.response.length}} for survey \"${surveyId}\" with {${surveyFound.questions.length}} questions`,
-      );
-    const surveyQuestionsArr = surveyFound.questions.map((q) =>
-      q._id.toString(),
-    );
-    const surveyResponseQuestionsArr = surveyResponse.response.map(
-      (r) => r.questionId,
-    );
-    // Check if the questions id's given in the response answers are valid.
-    if (
-      !this.areQuestionsIdsValid(surveyQuestionsArr, surveyResponseQuestionsArr)
-    )
-      throw new BadRequestException(
-        `Invalid questions id given in the response aren't matching the survey questions`,
-      );
-    return this.surveyResponseService.createResponse(
+    if (!this.isSurveyOpen(surveyFound.endDate))
+      throw new BadRequestException('Survey is closed');
+    // Create response using the survey response service.
+    const responseId = await this.surveyResponseService.createResponse(
+      surveyFound.questions,
       surveyResponse.response,
       surveyId,
       userId,
     );
-  }
-
-  private areQuestionsIdsValid(
-    questionsFromSurvey: string[],
-    questionsFromResponse: string[],
-  ): boolean {
-    return questionsFromResponse.every((q) => questionsFromSurvey.includes(q));
+    return {
+      message: `Survey response id \"${responseId}\" registered successfuly`,
+    };
   }
 
   /**
@@ -163,67 +140,76 @@ export class SurveyService {
       }
     }
   }
-}
 
-/**
- * Returns the aggregation pipeline for the survey options.
- * @param {string} surveyId
- * @returns aggregate pipeline object
- */
-const getSurveyOptions = (surveyId: string) => {
-  const sid = new Types.ObjectId(surveyId);
-  return [
-    // Pipeline stage #1: Get the wanted survey by it's id.
-    {
-      $match: {
-        _id: sid,
+  /**
+   * Returns if the survey is still open.
+   * @param {string} endDate
+   * @returns boolean
+   */
+  private isSurveyOpen(endDate: string): boolean {
+    return new Date(endDate) > new Date();
+  }
+
+  /**
+   * Returns the aggregation pipeline for the survey options.
+   * @param {string} surveyId
+   * @returns aggregate pipeline object
+   */
+  private getSurveyOptions(surveyId: string) {
+    const sid = new Types.ObjectId(surveyId);
+    return [
+      // Pipeline stage #1: Get the wanted survey by it's id.
+      {
+        $match: {
+          _id: sid,
+        },
       },
-    },
-    {
-      $unset: ['__v'],
-    },
-    // Pipeline stage #2: Lookup the questions records by oids.
-    {
-      $lookup: {
-        from: 'surveyquestions',
-        localField: 'questions',
-        foreignField: '_id',
-        as: 'questions',
-        pipeline: [
-          {
-            // Exclude the unwanted fields.
-            $unset: [
-              '__v',
-              'surveyId',
-              'createdAt',
-              'updatedAt',
-              'options._id',
-              'user',
-            ],
-          },
-        ],
+      {
+        $unset: ['__v'],
       },
-    },
-    {
-      $lookup: {
-        from: 'users',
-        localField: 'user',
-        foreignField: '_id',
-        as: 'owner',
-        pipeline: [
-          {
-            // Exclude the unwanted fields.
-            $unset: [
-              '__v',
-              'password',
-              'email',
-              'updatedAt',
-              'createdAt',
-              'verified',
-            ],
-          },
-        ],
+      // Pipeline stage #2: Lookup the questions records by oids.
+      {
+        $lookup: {
+          from: 'surveyquestions',
+          localField: 'questions',
+          foreignField: '_id',
+          as: 'questions',
+          pipeline: [
+            {
+              // Exclude the unwanted fields.
+              $unset: [
+                '__v',
+                'surveyId',
+                'createdAt',
+                'updatedAt',
+                'options._id',
+                'user',
+              ],
+            },
+          ],
+        },
       },
-    },
-  ];
-};
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'owner',
+          pipeline: [
+            {
+              // Exclude the unwanted fields.
+              $unset: [
+                '__v',
+                'password',
+                'email',
+                'updatedAt',
+                'createdAt',
+                'verified',
+              ],
+            },
+          ],
+        },
+      },
+    ];
+  }
+}

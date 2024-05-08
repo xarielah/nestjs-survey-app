@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SurveyAnswer } from 'src/db/schema/survey/survey-answer.schema';
 import { SurveyResponse } from 'src/db/schema/survey/survey-response.schema';
 import {
@@ -20,14 +20,36 @@ export class SurveyResponseService {
     return SurveyAnswer.insertMany(a);
   }
 
+  /**
+   * Checks if the questions and answers are valid.
+   * @param {ObjectId[]} surveyQuestions
+   * @param {string[]} surveyAnswers
+   * @returns boolean
+   */
+  private isQuestionsAndAnswersValid(
+    surveyQuestions: string[],
+    surveyAnswers: string[],
+  ): boolean {
+    if (surveyQuestions.length != surveyAnswers.length)
+      throw new BadRequestException('Invalid number of answers given');
+    return surveyQuestions.every((q) => surveyAnswers.includes(q.toString()));
+  }
+
   public async createResponse(
+    sQuestions: string[],
     answers: SurveyRawAnswer[],
     surveyId: string,
     userId: string,
   ): Promise<any> {
+    const a = answers.map((a) => a.questionId);
+    if (!this.isQuestionsAndAnswersValid(sQuestions, a))
+      throw new BadRequestException(
+        "Invalid questions id given in the response aren't matching the survey questions",
+      );
     const newResponse = new SurveyResponse({ survey: surveyId, user: userId });
     const ans = await this.createAnswers(answers, newResponse._id.toString());
     newResponse.answers = ans.map((a) => a._id.toString());
-    return newResponse.save();
+    await newResponse.save();
+    return newResponse._id.toString();
   }
 }
