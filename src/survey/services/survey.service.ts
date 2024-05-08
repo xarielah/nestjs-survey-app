@@ -26,62 +26,11 @@ export class SurveyService {
   public async get(surveyId: string) {
     if (!surveyId || !Types.ObjectId.isValid(surveyId))
       throw new BadRequestException('Survey id is missing or invalid');
-    // String id must be coverted to an ObjectID to be used on the aggregate.
-    const sid = new Types.ObjectId(surveyId);
-    const foundSurvey = await Survey.aggregate([
-      // Pipeline stage #1: Get the wanted survey by it's id.
-      {
-        $match: {
-          _id: sid,
-        },
-      },
-      {
-        $unset: ['__v'],
-      },
-      // Pipeline stage #2: Lookup the questions records by oids.
-      {
-        $lookup: {
-          from: 'surveyquestions',
-          localField: 'questions',
-          foreignField: '_id',
-          as: 'questions',
-          pipeline: [
-            {
-              // Exclude the unwanted fields.
-              $unset: [
-                '__v',
-                'surveyId',
-                'createdAt',
-                'updatedAt',
-                'options._id',
-                'user',
-              ],
-            },
-          ],
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'user',
-          foreignField: '_id',
-          as: 'owner',
-          pipeline: [
-            {
-              // Exclude the unwanted fields.
-              $unset: [
-                '__v',
-                'password',
-                'email',
-                'updatedAt',
-                'createdAt',
-                'verified',
-              ],
-            },
-          ],
-        },
-      },
-    ]).then((res) => res[0]);
+    // Get the survey with the questions populated.
+    const aggregateOptions = getSurveyOptions(surveyId);
+    const foundSurvey = await Survey.aggregate(aggregateOptions).then(
+      (res) => res[0],
+    );
     // If the survey is not found, throw a not found exception.
     if (!foundSurvey) throw new NotFoundException();
     return foundSurvey;
@@ -215,3 +164,66 @@ export class SurveyService {
     }
   }
 }
+
+/**
+ * Returns the aggregation pipeline for the survey options.
+ * @param {string} surveyId
+ * @returns aggregate pipeline object
+ */
+const getSurveyOptions = (surveyId: string) => {
+  const sid = new Types.ObjectId(surveyId);
+  return [
+    // Pipeline stage #1: Get the wanted survey by it's id.
+    {
+      $match: {
+        _id: sid,
+      },
+    },
+    {
+      $unset: ['__v'],
+    },
+    // Pipeline stage #2: Lookup the questions records by oids.
+    {
+      $lookup: {
+        from: 'surveyquestions',
+        localField: 'questions',
+        foreignField: '_id',
+        as: 'questions',
+        pipeline: [
+          {
+            // Exclude the unwanted fields.
+            $unset: [
+              '__v',
+              'surveyId',
+              'createdAt',
+              'updatedAt',
+              'options._id',
+              'user',
+            ],
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'user',
+        foreignField: '_id',
+        as: 'owner',
+        pipeline: [
+          {
+            // Exclude the unwanted fields.
+            $unset: [
+              '__v',
+              'password',
+              'email',
+              'updatedAt',
+              'createdAt',
+              'verified',
+            ],
+          },
+        ],
+      },
+    },
+  ];
+};
