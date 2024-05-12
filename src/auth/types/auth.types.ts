@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { Survey } from 'src/survey/types/survey.types';
 import { TokenPayload } from 'src/token/token.types';
 
 export type LoggedUserPayload = {
@@ -13,4 +14,4 @@ export type UserAccount = {
   updatedAt: Date;
 };
 
-export type AuthedRequest = Request & { user: TokenPayload };
+export type AuthedRequest = Request & { user: TokenPayload; survey?: Survey };

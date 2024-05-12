@@ -43,28 +43,6 @@ export class VerificationTokenService {
     return VerificationToken.findOneAndDelete({ userId }).exec();
   }
 
-  /**
-   * Gets a user id and a token, and verifies the verification token, deletes the verification record for user.
-   * @param {string} userId
-   * @param {string} token
-   * @returns boolean
-   */
-  public async verifyUserTokenAndRequestor(
-    userId: string,
-    token: string,
-  ): Promise<boolean> {
-    try {
-      const vt = await this.verifyToken(token);
-      if (!vt) return false;
-      const payload = await this.tokenService.decodeToken(token);
-      if (payload.id !== userId) return false;
-      return true;
-    } catch (error) {
-      console.log(error);
-      return false;
-    }
-  }
-
   private async get(verificationToken: string): Promise<any> {
     return VerificationToken.findOne({ token: verificationToken }).exec();
   }

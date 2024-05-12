@@ -16,8 +16,9 @@ import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthUserDto } from './dto/auth-user.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
-import { MustBeLogged } from './guards/must-be-logged.guard';
+import { LoggedUsersGuard } from './guards/logged-users.guard';
 import { MustNotBeLogged } from './guards/must-not-be-logged.guard';
+import { AuthedRequest } from './types/auth.types';
 
 @Controller('auth')
 export class AuthController {
@@ -53,7 +54,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(MustBeLogged)
+  @UseGuards(LoggedUsersGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('logout')
   public async logout(@Res() res: Response) {
@@ -72,7 +73,7 @@ export class AuthController {
     return res.send();
   }
 
-  @UseGuards(MustBeLogged)
+  @UseGuards(LoggedUsersGuard)
   @HttpCode(HttpStatus.CREATED)
   @Post('refresh')
   public async refresh(@Req() req: Request, @Res() res: Response) {
@@ -88,25 +89,21 @@ export class AuthController {
     }
   }
 
-  @UseGuards(MustBeLogged)
   @Get('verify')
   public async verify(
     @Query('token') token: string,
-    @Req() req: Request,
+    @Req() req: AuthedRequest,
     @Res() res: Response,
   ) {
-    const accessToken = req.cookies['accessToken'];
-    // In order to reduce db calls, since 'verified' is mounted and decoded on the jwt token,
-    // we could just re-decode the token with 'true' value and return a new http cookie to the client.
-    const newAccessToken = await this.authService.verifyUser(
-      accessToken,
-      token,
-    );
-    res.cookie('accessToken', newAccessToken, {
-      httpOnly: true,
-      sameSite: 'none',
-      secure: true,
-    });
-    return res.json({ message: 'User verified', accessToken: newAccessToken });
+    const newAccessToken = await this.authService.verifyUser(token, req.user);
+    // If the user is the same as the one in the token, we update the access token.
+    if (newAccessToken) {
+      res.cookie('accessToken', newAccessToken, {
+        httpOnly: true,
+        sameSite: 'none',
+        secure: true,
+      });
+    }
+    return res.json({ message: 'User verified successfully' });
   }
 }

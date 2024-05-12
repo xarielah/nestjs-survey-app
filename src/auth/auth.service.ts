@@ -8,6 +8,7 @@ import {
 import { SessionService } from 'src/db/session.service';
 import { UserService } from 'src/db/user.service';
 import { VerificationTokenService } from 'src/db/verification-token.service';
+import { TokenPayload } from 'src/token/token.types';
 import { TokenService } from '../token/token.service';
 import { AuthUserDto } from './dto/auth-user.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
@@ -100,23 +101,17 @@ export class AuthService {
    * Gets a token and verifies the user.
    * @param {string} token
    */
-  public async verifyUser(accessToken: string, token: string): Promise<string> {
+  public async verifyUser(token: string, user: TokenPayload): Promise<string> {
     if (!token) throw new BadRequestException();
     try {
-      const payload = await this.tokenService.decodeToken(accessToken);
-      // Verify the token's signature and expiration, and also that the requestor is the same user we're verifiying.
-      const isVerified =
-        await this.verificationService.verifyUserTokenAndRequestor(
-          payload.id,
-          token,
-        );
-      // True for success, false for failure.
-      if (!isVerified) throw new ForbiddenException();
+      const payload = await this.tokenService.decodeToken(token);
       // Update the user's record verified state first.
       await this.userService.updateUserVerifiedState(payload.id);
       // Remove the verification token record.
       await this.verificationService.removeToken(payload.id);
-      // Create a new access token for the user.
+      // If the user is not the same as the one in the token, we do not update the access token.
+      if (!user || user.id !== payload.id) return null;
+      // User verified is same as logged, we serialize a new access token for the user.
       const newAccessToken = await this.tokenService.createAccessToken({
         username: payload.username,
         email: payload.email,
