@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,36 +9,36 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { MustBeVerified } from 'src/auth/guards/must-be-verified.guard';
+import { VerifiedUsersGuard } from 'src/auth/guards/verified-users.guard';
 import { AuthedRequest } from 'src/auth/types/auth.types';
 import { CreateSurveyDTO } from './dto/create-survey.dto';
 import { SurveyResponseDTO } from './dto/survey-response.dto';
+import { UpdateSurveyDTO } from './dto/update-survey.dto';
+import { SurveyOpenGuard } from './guards/survey-open.guard';
+import { SurveyOwnerGuard } from './guards/survey-owner.guard';
+import { SurveyValidGuard } from './guards/survey-valid.guard';
 import { SurveyService } from './services/survey.service';
 
+@UseGuards(VerifiedUsersGuard)
 @Controller('survey')
-@UseGuards(MustBeVerified)
 export class SurveyController {
   constructor(private readonly surveyService: SurveyService) {}
 
+  @UseGuards(SurveyValidGuard)
   @Get('/:id')
-  async getSurveyById(@Param('id') surveyId: string) {
-    return await this.surveyService.get(surveyId);
+  async getSurveyById(@Req() req: AuthedRequest) {
+    return req.survey;
   }
 
-  @Get('/:id/questions')
-  async getQuestionsBySurveyId(@Param('id') surveyId: string) {
-    if (!surveyId) throw new BadRequestException('Survey id is required');
-    return '';
-  }
-
+  @UseGuards(SurveyOwnerGuard)
   @Patch('/:id')
-  async updateSurvey(@Param('id') surveyId: string, @Body() survey: any) {
-    if (!surveyId) throw new BadRequestException('Survey id is required');
-    if (!survey) throw new BadRequestException('Survey data is required');
-    return '';
+  async updateSurvey(
+    @Param('id') surveyId: string,
+    @Body() survey: UpdateSurveyDTO,
+  ) {
+    return await this.surveyService.updateSurvey(surveyId, survey);
   }
 
-  // Have this POST over the /:id one.
   @Post()
   async createSurvey(
     @Body() survey: CreateSurveyDTO,
@@ -48,22 +47,22 @@ export class SurveyController {
     return await this.surveyService.createSurvey(survey, req.user.id);
   }
 
-  // This should be under the /create endpoint.
+  @UseGuards(SurveyOpenGuard)
   @Post('/:id')
   async submitSurveyResponse(
     @Body() surveyResponse: SurveyResponseDTO,
-    @Param('id') surveyId: string,
     @Req() req: AuthedRequest,
   ) {
     return await this.surveyService.submitSurveyResponse(
       surveyResponse,
-      surveyId,
+      req.survey,
       req.user.id,
     );
   }
 
+  @UseGuards(SurveyOwnerGuard)
   @Delete('/:id')
   async deleteSurvey(@Param('id') surveyId: string) {
-    return true;
+    return await this.surveyService.deleteSurvey(surveyId);
   }
 }

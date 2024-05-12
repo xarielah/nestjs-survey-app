@@ -4,9 +4,11 @@ export type Survey = {
   _id: string;
   name: string;
   description?: string;
-  questions: SurveyQuestion[];
+  questions: SurveyQuestion[] | string[];
   createdAt: Date;
+  user: string;
   updatedAt: Date;
+  endDate: string;
 };
 
 export type CreateSurvey = {
@@ -15,4 +17,10 @@ export type CreateSurvey = {
   endDate: string;
   description?: string;
   questions: CreateSurveyQuestion[];
+};
+
+export type UpdateSurveyFields = {
+  name?: string;
+  description?: string;
+  endDate?: string;
 };

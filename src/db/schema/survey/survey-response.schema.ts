@@ -16,6 +16,7 @@ const surveyResponseSchema = new Schema(
       {
         type: Schema.Types.ObjectId,
         ref: 'SurveyAnswer',
+        required: true,
       },
     ],
   },

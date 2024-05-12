@@ -4,10 +4,15 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { Error, Types } from 'mongoose';
+import { Types, isValidObjectId } from 'mongoose';
 import { Survey } from 'src/db/schema/survey/survey.schema';
 import { SurveyResponseDTO } from '../dto/survey-response.dto';
-import { CreateSurvey } from '../types/survey.types';
+import { SurveyQuestion } from '../types/survey-question.types';
+import {
+  CreateSurvey,
+  UpdateSurveyFields,
+  type Survey as SurveyObject,
+} from '../types/survey.types';
 import { SurveyQuestionService } from './survey-question.service';
 import { SurveyResponseService } from './survey-response.service';
 
@@ -23,68 +28,99 @@ export class SurveyService {
    * @param {string} surveyId
    * @returns
    */
-  public async get(surveyId: string) {
-    if (!surveyId || !Types.ObjectId.isValid(surveyId))
-      throw new BadRequestException('Survey id is missing or invalid');
+  public async get(surveyId: string): Promise<SurveyObject> {
     // Get the survey with the questions populated.
     const aggregateOptions = this.getSurveyOptions(surveyId);
-    const foundSurvey = await Survey.aggregate(aggregateOptions).then(
-      (res) => res[0],
+    const foundSurvey = await Survey.aggregate(aggregateOptions);
+    return foundSurvey[0];
+  }
+
+  public async deleteSurvey(surveyId: string): Promise<{ message: string }> {
+    await Survey.findByIdAndDelete(surveyId);
+    return { message: 'Survey deleted successfuly' };
+  }
+
+  /**
+   * Gets a survey by it's id, if it doesn't exist, throws a not found exception.
+   * @param {string} surveyId
+   */
+  public async getOrError(surveyId: string): Promise<SurveyObject> {
+    const survey = await this.get(surveyId);
+    if (!survey)
+      throw new NotFoundException(`Survey id \"${surveyId}\" not found`);
+    return survey;
+  }
+
+  /**
+   * Returns true if the survey id is valid, otherwise throws a bad request exception.
+   * @param {string} surveyId
+   */
+  public isValidID(surveyId: string): boolean {
+    if (!isValidObjectId(surveyId))
+      throw new BadRequestException(`Survey id \"${surveyId}\" is invalid`);
+    return true;
+  }
+
+  private areUpdatedFieldsValid(survey: UpdateSurveyFields): boolean {
+    return !!(
+      Object.keys(survey).length > 0 ||
+      survey.name ||
+      survey.description ||
+      survey.endDate
     );
-    // If the survey is not found, throw a not found exception.
-    if (!foundSurvey) throw new NotFoundException();
-    return foundSurvey;
   }
-
-  public async getQuestionsBySurveyId(surveyId: string) {
-    if (!surveyId) throw new BadRequestException('Survey id is required');
-    return '';
-  }
-
-  public async updateSurvey(surveyId: string, survey: any) {
-    if (!survey) throw new Error('Survey data is required');
-    return '';
+  /**
+   * Gets a survey by it's id and updates the fields with the given survey object.
+   * @param {string} surveyId
+   * @param {any} survey
+   */
+  public async updateSurvey(
+    surveyId: string,
+    survey: any,
+  ): Promise<{ message: string }> {
+    if (!isValidObjectId(surveyId))
+      throw new NotFoundException(`Survey id \"${surveyId}\" not found`);
+    // Check if the survey exists.
+    const surveyFound = await Survey.findById(surveyId);
+    if (!surveyFound)
+      throw new NotFoundException(`Survey id \"${surveyId}\" not found`);
+    // Check if the fields are valid.
+    if (!this.areUpdatedFieldsValid(survey))
+      throw new BadRequestException('Invalid fields given');
+    // Update the survey fields accordinly.
+    surveyFound.name = survey.name || surveyFound.name;
+    surveyFound.description = survey.description || surveyFound.description;
+    surveyFound.endDate = survey.endDate || surveyFound.endDate;
+    await surveyFound.save();
+    // Return the message.
+    return { message: `Survey \`${surveyId}\` updated successfuly` };
   }
 
   /**
    * Gets a survey response and saves it to the database.
    * @param {SurveyResponseDTO} surveyResponse
-   * @param {string} surveyId
+   * @param {SurveyObject} survey
    * @param {string} userId
    */
   public async submitSurveyResponse(
     surveyResponse: SurveyResponseDTO,
-    surveyId: string,
+    survey: SurveyObject,
     userId: string,
   ) {
-    // Check if the survey id is a valid object id.
-    if (!Types.ObjectId.isValid(surveyId))
-      throw new BadRequestException(
-        'Invalid survey id given, must be a valid id',
-      );
-    // Check if the survey exists.
-    const surveyFound = await Survey.findById(surveyId);
-    // If the survey is not found, throw a not found exception.
-    if (!surveyFound)
-      throw new NotFoundException(`Survey with id \"${surveyId}\"not found`);
-    // Check if the survey is still open.
-    if (!this.isSurveyOpen(surveyFound.endDate))
-      throw new BadRequestException('Survey is closed');
     // Create response using the survey response service.
     const responseId = await this.surveyResponseService.createResponse(
-      surveyFound.questions,
+      survey.questions as SurveyQuestion[],
       surveyResponse.response,
-      surveyId,
+      survey._id.toString(),
       userId,
     );
     return {
       message: `Survey response id \"${responseId}\" registered successfuly`,
     };
   }
-
   /**
    * Creates a survey with the given data and the user id as the owner of the survey.
-   * @param {Omer<CreateSurvey, "user">} survey
+   * @param {Omit<CreateSurvey, "user">} survey
    * @param {string} userId
    */
   public async createSurvey(
@@ -146,7 +182,7 @@ export class SurveyService {
    * @param {string} endDate
    * @returns boolean
    */
-  private isSurveyOpen(endDate: string): boolean {
+  public isSurveyOpen(endDate: string): boolean {
     return new Date(endDate) > new Date();
   }
 

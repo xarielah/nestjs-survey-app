@@ -11,10 +11,12 @@ const surveyAnswerSchema = new Schema(
     surveyResponse: {
       type: Schema.Types.ObjectId,
       ref: 'SurveyResponse',
+      required: true,
     },
     question: {
       type: Schema.Types.ObjectId,
       ref: 'SurveyQuestion',
+      required: true,
     },
   },
   { timestamps: true },

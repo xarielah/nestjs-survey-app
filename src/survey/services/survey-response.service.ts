@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { SurveyAnswer } from 'src/db/schema/survey/survey-answer.schema';
 import { SurveyResponse } from 'src/db/schema/survey/survey-response.schema';
+import { SurveyQuestion } from '../types/survey-question.types';
 import {
   SurveyRawAnswer,
   SurveyUserAnswer,
@@ -36,13 +37,14 @@ export class SurveyResponseService {
   }
 
   public async createResponse(
-    sQuestions: string[],
+    sQuestions: SurveyQuestion[],
     answers: SurveyRawAnswer[],
     surveyId: string,
     userId: string,
   ): Promise<any> {
     const a = answers.map((a) => a.questionId);
-    if (!this.isQuestionsAndAnswersValid(sQuestions, a))
+    const q = sQuestions.map((q) => q._id.toString());
+    if (!this.isQuestionsAndAnswersValid(q, a))
       throw new BadRequestException(
         "Invalid questions id given in the response aren't matching the survey questions",
       );
