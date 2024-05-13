@@ -21,6 +21,10 @@ const surveySchema = new Schema(
       type: Date,
       required: true,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
     questions: [
       {
         type: Schema.Types.ObjectId,

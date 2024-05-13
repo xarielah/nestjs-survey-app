@@ -23,6 +23,17 @@ export class SurveyService {
     private readonly surveyResponseService: SurveyResponseService,
   ) {}
 
+  public async endSurvey(survey: SurveyObject): Promise<{ message: string }> {
+    if (!this.isSurveyOpen(survey.endDate))
+      throw new BadRequestException(
+        `Survey id \"${survey._id.toString()}\" is already closed`,
+      );
+    await Survey.findByIdAndUpdate(survey._id, { endDate: new Date() });
+    return {
+      message: `Survey id \"${survey._id.toString()}\" ended successfuly`,
+    };
+  }
+
   /**
    * Gets a survey by it's id and returns the survey document, with the questions populated.
    * @param {string} surveyId
@@ -35,9 +46,14 @@ export class SurveyService {
     return foundSurvey[0];
   }
 
-  public async deleteSurvey(surveyId: string): Promise<{ message: string }> {
-    await Survey.findByIdAndDelete(surveyId);
-    return { message: 'Survey deleted successfuly' };
+  public async deleteSurvey(
+    survey: SurveyObject,
+  ): Promise<{ message: string }> {
+    // "Deletes" the survey.
+    await Survey.findByIdAndUpdate(survey._id, { isDeleted: true });
+    return {
+      message: `Survey id \"${survey._id.toString()}\" deleted successfuly`,
+    };
   }
 
   /**
@@ -198,10 +214,11 @@ export class SurveyService {
       {
         $match: {
           _id: sid,
+          isDeleted: false,
         },
       },
       {
-        $unset: ['__v'],
+        $unset: ['__v', 'updatedAt'],
       },
       // Pipeline stage #2: Lookup the questions records by oids.
       {

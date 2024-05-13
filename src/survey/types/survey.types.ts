@@ -8,6 +8,7 @@ export type Survey = {
   createdAt: Date;
   user: string;
   updatedAt: Date;
+  isDeleted: boolean;
   endDate: string;
 };
 

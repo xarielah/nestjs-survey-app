@@ -21,6 +21,7 @@ export class SurveyOwnerGuard implements CanActivate {
     // Get the survey by the id and check if the user is the owner of the survey.
     if (survey.user.toString() != request.user.id)
       throw new UnauthorizedException('You are not the owner of this survey');
+    request.survey = survey;
     return true;
   }
 }

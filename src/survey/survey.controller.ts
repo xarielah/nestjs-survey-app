@@ -61,8 +61,14 @@ export class SurveyController {
   }
 
   @UseGuards(SurveyOwnerGuard)
+  @Post('/:id/end')
+  async endSurvey(@Req() req: AuthedRequest) {
+    return await this.surveyService.endSurvey(req.survey);
+  }
+
+  @UseGuards(SurveyOwnerGuard)
   @Delete('/:id')
-  async deleteSurvey(@Param('id') surveyId: string) {
-    return await this.surveyService.deleteSurvey(surveyId);
+  async deleteSurvey(@Req() req: AuthedRequest) {
+    return await this.surveyService.deleteSurvey(req.survey);
   }
 }
