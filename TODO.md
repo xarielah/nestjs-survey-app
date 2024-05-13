@@ -18,17 +18,31 @@ Edit survey’s fields. Updating user must be the owner of the survey. User must
 
 
 
+---
+
+
+
+Status: *DONE*
+
 > DELETE - /api/survey/:id
 
-<s>Deletes a survey. Might need to set rules, maybe an active flag or “isDeleted” flag in order to be able to restore or have it stay and then deleted after 30 days from deletion request for example. User must be the owner.</s>
-
-**MAKE IT SO IT DELETES ALL RELATED DATA - CASCADE**
+Flag on the survey is stating if the survey is deleted (isDeleted) or not. After that, the survey is could not be fetched / edited.
 
 
 
-> \*NEW\* POST - /api/survey/:id
+---
+
+
+
+Status: Work in progress
+
+> \*NEW\* POST - /api/survey/:id/end
 
  Sets the end date to now of a survey. **User must be the owner**.
+
+
+
+---
 
 
 
